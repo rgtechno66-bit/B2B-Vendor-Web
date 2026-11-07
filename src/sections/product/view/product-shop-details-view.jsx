@@ -24,14 +24,23 @@ import { useCheckoutContext } from '../../checkout/context';
 import { ProductDetailsSummary } from '../product-details-summary';
 import { ProductDetailsCarousel } from '../product-details-carousel';
 import { Iconify } from 'src/components/iconify';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function ProductShopDetailsView({ product }) {
   const checkout = useCheckoutContext();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  /** Return to the exact listing the user came from (keeps ?page=, category, sub category, etc.). */
   const handleBack = () => {
-    navigate('/product');
+    const from = location.state?.from;
+    if (from) {
+      navigate(from);
+    } else if (window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/product');
+    }
   };
 
   return (

@@ -126,7 +126,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.62.4",
     "@types/react": "^18.3.3",
     "@vitejs/plugin-react-swc": "^3.7.0",
     "eslint": "^8.57.0",

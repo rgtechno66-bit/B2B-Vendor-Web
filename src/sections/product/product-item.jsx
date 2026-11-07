@@ -4,7 +4,7 @@ import Card from '@mui/material/Card';
 import Divider from '@mui/material/Divider';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { fCurrency } from 'src/utils/format-number';
 import { Iconify } from 'src/components/iconify';
@@ -44,6 +44,7 @@ const imageBoxSx = {
 
 export function ProductItem({ product }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const checkout = useCheckoutContext();
 
   const {
@@ -85,7 +86,13 @@ export function ProductItem({ product }) {
   };
 
   return (
-    <Card sx={cardSx} onClick={() => navigate(`/product/${id}`)}>
+    <Card sx={cardSx} onClick={() =>
+        // Remember the listing URL (page, category, sub category, search, sort) for "Back"
+        navigate(`/product/${id}`, {
+          state: { from: `${location.pathname}${location.search}` },
+        })
+      }
+    >
       <Box sx={imageBoxSx}>
         <Fab
           color="warning"

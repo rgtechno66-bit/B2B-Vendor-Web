@@ -22,13 +22,27 @@ import { ProductFiltersResult } from '../product-filters-result';
 import { CustomSearch } from '../CustomSearch';
 import { fetchItemsPaginated, DEFAULT_ITEMS_PER_PAGE } from 'src/services/productApi';
 import { fetchCategoryListingThunk } from 'src/redux/CategoryListingReducer';
-import { Box, Button, Grid, LinearProgress } from '@mui/material';
-import { getCategoryDisplayImages, isPlaceholderProductImage } from 'src/utils/product-image';
+import { Box, ButtonBase, Drawer } from '@mui/material';
+import { Iconify } from 'src/components/iconify';
+import {
+  DUMMY_IMAGE,
+  getCategoryDisplayImages,
+  handleProductImageError,
+  isPlaceholderProductImage,
+} from 'src/utils/product-image';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CourseWidgetSummaryData } from '../components/course-widget-summary';
 
-/** Change only this to update subcategory image rotation interval (milliseconds). */
-const SUBCATEGORY_IMAGE_CHANGE_INTERVAL_MS = 5000;
+/** Product grid columns when products share the page with the sub category sidebar. */
+const SPLIT_GRID_COLUMNS = {
+  xs: 'repeat(2, 1fr)',
+  sm: 'repeat(3, 1fr)',
+  md: 'repeat(3, 1fr)',
+  lg: 'repeat(4, 1fr)',
+  xl: 'repeat(5, 1fr)',
+};
+
+/** Offset (px) below the sticky site header for the sidebar / scroll target. */
+const STICKY_TOP_OFFSET = 110;
 
 export function ProductShopView() {
   const dispatch = useDispatch();
@@ -39,8 +53,7 @@ export function ProductShopView() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const [visibleSubGroup2, setVisibleSubGroup2] = useState(18);
-  const ITEMS_PER_LOAD = 18;
+  const productsPaneRef = useRef(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -95,6 +108,7 @@ export function ProductShopView() {
   const checkout = useCheckoutContext?.() || { items: [] };
 
   const openFilters = useBoolean();
+  const openSubCategorySheet = useBoolean();
 
   const [searchQuery, setSearchQuery] = useState(() => urlSearch);
   const debouncedQuery = useDebounce(searchQuery, 500);
@@ -103,7 +117,7 @@ export function ProductShopView() {
   locationSearchRef.current = location.search;
 
   /** Only navigate when query string actually changes (prevents API loop). */
-  const updateUrlParams = useCallback((updates, { resetPage = false } = {}) => {
+  const updateUrlParams = useCallback((updates, { resetPage = false, push = false } = {}) => {
     const params = new URLSearchParams(locationSearchRef.current);
 
     if (resetPage) {
@@ -133,9 +147,10 @@ export function ProductShopView() {
       return;
     }
 
+    // push = new history entry (browser Back returns here); replace = silent URL sync
     navigate(
       { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' },
-      { replace: true }
+      { replace: !push }
     );
   }, [location.pathname, navigate]);
 
@@ -335,6 +350,8 @@ export function ProductShopView() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [shouldDisplaySubGroup2, subGroup1Param, categories]);
 
+  const showSplitLayout = shouldDisplaySubGroup2 && sortedSubGroup2List.length > 0;
+
   const canReset =
     filters.state.gender.length > 0 ||
     filters.state.colors.length > 0 ||
@@ -345,6 +362,16 @@ export function ProductShopView() {
 
   const notFound = !products.length && canReset && !loading;
 
+  /** Bring the products pane into view if its top has scrolled off-screen. */
+  const revealProductsPane = useCallback(() => {
+    const pane = productsPaneRef.current;
+    if (!pane) return;
+    const { top } = pane.getBoundingClientRect();
+    if (top < STICKY_TOP_OFFSET || top > window.innerHeight * 0.6) {
+      pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
   const handleSortBy = useCallback((newValue) => {
     updateUrlParams({ sortBy: newValue, limit }, { resetPage: true });
   }, [updateUrlParams, limit]);
@@ -354,11 +381,19 @@ export function ProductShopView() {
   }, []);
 
   const handlePageChange = useCallback((newPage) => {
-    updateUrlParams({
-      page: newPage > 1 ? newPage : undefined,
-      limit,
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Push each page into history so browser Back goes 4 → 3 → 2 → 1, not straight to Home
+    updateUrlParams(
+      {
+        page: newPage > 1 ? newPage : undefined,
+        limit,
+      },
+      { push: true }
+    );
+    if (productsPaneRef.current) {
+      productsPaneRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [updateUrlParams, limit]);
 
   const productsEmpty = !loading && !products?.length && !canReset;
@@ -397,175 +432,288 @@ export function ProductShopView() {
     </Stack>
   );
 
-  const handleProductClick = (subGroup2Name) => {
+  /** Select a sub category (or null for "All") — products update in the right pane. */
+  const handleSubCategoryClick = (subGroup2Name) => {
     const params = new URLSearchParams(location.search);
-    params.set('subGroup2', subGroup2Name);
+    if (subGroup2Name) {
+      params.set('subGroup2', subGroup2Name);
+    } else {
+      params.delete('subGroup2');
+    }
     params.delete('page');
     params.set('limit', String(limit));
     navigate(`/product?${params.toString()}`);
+    openSubCategorySheet.onFalse();
+    revealProductsPane();
   };
+
+  const selectedSubCategoryLabel = subGroup2Param
+    ? sortedSubGroup2List.find((s) => isSubCategorySelected(s.name))?.name || subGroup2Param
+    : 'All Sub Categories';
+
+  /** Sub category rows — shared by the desktop sidebar and the mobile bottom sheet. */
+  const renderSubCategoryItems = [{ name: null, images: [] }, ...sortedSubGroup2List].map(
+    (subcategory) => {
+      const selected = subcategory.name
+        ? isSubCategorySelected(subcategory.name)
+        : !subGroup2Param;
+      const thumb = subcategory.images?.[0];
+      return (
+        <Box
+          key={subcategory.name || '__all__'}
+          role="button"
+          tabIndex={0}
+          aria-pressed={selected}
+          onClick={() => handleSubCategoryClick(subcategory.name)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSubCategoryClick(subcategory.name);
+            }
+          }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            flexShrink: 0,
+            px: 1.25,
+            py: 1,
+            minHeight: 48,
+            borderRadius: 1,
+            cursor: 'pointer',
+            bgcolor: selected ? '#111' : 'transparent',
+            color: selected ? '#fff' : '#222',
+            fontWeight: selected ? 700 : 500,
+            transition: 'background 0.15s ease, color 0.15s ease',
+            '&:hover': {
+              bgcolor: selected ? '#111' : 'rgba(255, 102, 0, 0.1)',
+            },
+          }}
+        >
+          {subcategory.name ? (
+            <Box
+              component="img"
+              src={thumb || DUMMY_IMAGE}
+              alt=""
+              onError={handleProductImageError}
+              sx={{
+                width: 36,
+                height: 36,
+                objectFit: 'contain',
+                bgcolor: '#fff',
+                borderRadius: 0.75,
+                border: '1px solid rgba(0,0,0,0.08)',
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Iconify icon="solar:list-bold" width={22} />
+            </Box>
+          )}
+          <Typography
+            variant="body2"
+            sx={{ flex: 1, fontWeight: 'inherit', color: 'inherit', lineHeight: 1.3 }}
+          >
+            {subcategory.name || 'All Sub Categories'}
+          </Typography>
+          {selected && (
+            <Iconify icon="eva:checkmark-fill" width={18} sx={{ color: '#FF6600', flexShrink: 0 }} />
+          )}
+        </Box>
+      );
+    }
+  );
+
+  /** Mobile: sticky selector bar + bottom sheet (replaces the sidebar below md). */
+  const renderMobileSubCategoryPicker = (
+    <>
+      <Box
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          position: 'sticky',
+          top: { xs: 56, sm: 64 },
+          zIndex: 5,
+          width: '100%',
+          py: 1,
+          bgcolor: 'background.default',
+        }}
+      >
+        <ButtonBase
+          onClick={openSubCategorySheet.onTrue}
+          sx={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2,
+            py: 1.25,
+            borderRadius: 1.5,
+            border: '1.5px solid #FF6600',
+            bgcolor: '#fff',
+            textAlign: 'left',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Iconify icon="solar:list-bold" width={20} sx={{ color: '#FF6600', flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} noWrap>
+              {subGroup1Param}
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
+              {selectedSubCategoryLabel}
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: '#FF6600', fontWeight: 700, flexShrink: 0 }}>
+            Change
+          </Typography>
+          <Iconify icon="eva:arrow-ios-downward-fill" width={18} sx={{ color: '#FF6600', flexShrink: 0 }} />
+        </ButtonBase>
+      </Box>
+
+      <Drawer
+        anchor="bottom"
+        open={openSubCategorySheet.value}
+        onClose={openSubCategorySheet.onFalse}
+        PaperProps={{
+          sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '75vh' },
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+          <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: 'rgba(0,0,0,0.2)' }} />
+        </Box>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 2,
+            py: 1.5,
+            borderBottom: '1px solid #eee',
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+              Sub Categories
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap component="div">
+              {subGroup1Param} · {sortedSubGroup2List.length}
+            </Typography>
+          </Box>
+          <ButtonBase onClick={openSubCategorySheet.onFalse} sx={{ p: 1, borderRadius: '50%' }} aria-label="Close">
+            <Iconify icon="mingcute:close-line" width={22} />
+          </ButtonBase>
+        </Box>
+        <Box sx={{ overflowY: 'auto', p: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          {renderSubCategoryItems}
+        </Box>
+      </Drawer>
+    </>
+  );
 
   const renderResults = (
     <ProductFiltersResult filters={filters} totalResults={totalResults} />
   );
   const renderNotFound = <EmptyContent filled sx={{ py: 10 }} />;
 
+  const renderSubCategorySidebar = (
+    <Box
+      component="aside"
+      sx={{
+        display: { xs: 'none', md: 'block' },
+        width: 260,
+        flexShrink: 0,
+        position: { md: 'sticky' },
+        top: { md: STICKY_TOP_OFFSET },
+        border: '1px solid #eee',
+        borderRadius: 1.5,
+        bgcolor: '#fff',
+        overflow: 'hidden',
+      }}
+    >
+      <Box sx={{ px: 2, py: 1.5, bgcolor: '#FF6600', color: '#fff' }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, textTransform: 'uppercase' }}>
+          Sub Categories
+        </Typography>
+        <Typography variant="caption" sx={{ opacity: 0.9 }} noWrap component="div">
+          {subGroup1Param}
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          maxHeight: `calc(100vh - ${STICKY_TOP_OFFSET + 90}px)`,
+          p: 1,
+          gap: 0.5,
+        }}
+      >
+        {renderSubCategoryItems}
+      </Box>
+    </Box>
+  );
+
   return (
     <Container sx={{ mb: 15 }}>
       <CartIcon totalItems={checkout?.items?.length || 0} />
-      <Stack spacing={2.5} sx={{ mb: { xs: 3, md: 5 } }} >
+      <Stack spacing={2.5} sx={{ mb: { xs: 3, md: 5 } }}>
         {renderFilters}
 
         {!subGroup1Param && canReset && renderResults}
-
-        {shouldDisplaySubGroup2 && sortedSubGroup2List.length > 0 && (
-          <>
-            <Typography
-              variant="h3"
-              component="h1"
-              sx={{
-                fontSize: {
-                  xs: '1rem', // Small screens (extra small breakpoint)
-                  sm: '1.2rem', // Small screens
-                  md: '2rem',   // Medium screens and above
-                },
-                fontWeight: '600',
-                color: '#000',
-                lineHeight: 1.2,
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase', // Capitalizes the first letter of each word
-                display: 'inline-block', // Ensures underline adjusts to text width
-                textDecoration: 'underline', // Adds underline
-                textDecorationColor: '#000', // Ensures the underline is black
-                textDecorationThickness: '3px', // Adjusts the thickness of the underline
-                textUnderlineOffset: '5px', // Adjusts the spacing between text and underline
-              }}
-            >
-              Sub Categories
-            </Typography>
-
-            <Grid container spacing={3}>
-              {sortedSubGroup2List
-                .slice(0, visibleSubGroup2)
-                .map((subcategory) => (
-                  <Grid
-                    key={subcategory.name}
-                    item
-                    xs={6}
-                    sm={4}
-                    md={3}
-                    lg={2}
-                    xl={2}
-                  >
-                    <Box
-                      sx={{
-                        cursor: 'pointer',
-                        borderRadius: 1.5,
-                        transition: 'transform 0.2s ease',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                        },
-                      }}
-                      onClick={() => handleProductClick(subcategory.name)}
-                    >
-                      <CourseWidgetSummaryData
-                        title={subcategory.name}
-                        image={subcategory.images}
-                        imageChangeInterval={SUBCATEGORY_IMAGE_CHANGE_INTERVAL_MS}
-                        randomImage
-                        selected={isSubCategorySelected(subcategory.name)}
-                      />
-                    </Box>
-                  </Grid>
-                ))}
-            </Grid>
-            {sortedSubGroup2List.length > ITEMS_PER_LOAD && (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end', // Align content to the right
-                  justifyContent: 'center',
-                  marginTop: '20px',
-                  width: '300px',
-                  marginX: 'auto', // Center the box horizontally
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    marginBottom: '10px',
-                    fontWeight: 500,
-                    color: '#333',
-                    textAlign: 'center',
-                  }}
-                >
-                  You&apos;ve viewed {visibleSubGroup2} of {sortedSubGroup2List.length} Product Categories
-                </Typography>
-
-                <LinearProgress
-                  variant="determinate"
-                  value={(visibleSubGroup2 / sortedSubGroup2List.length) * 100}
-                  sx={{
-                    height: 6,
-                    width: '100%', // Match button and progress bar width
-                    borderRadius: 3,
-                    // backgroundColor: '#e0e0e0',
-                    // '& .MuiLinearProgress-bar': {
-                    //   backgroundColor: 'rgb(242, 25, 25)',
-                    // },
-                    marginBottom: '15px',
-                  }}
-                />
-
-                <Button
-                  onClick={() => {
-                    if (visibleSubGroup2 < sortedSubGroup2List.length) {
-                      setVisibleSubGroup2(sortedSubGroup2List.length);
-                    } else {
-                      setVisibleSubGroup2(ITEMS_PER_LOAD);
-
-                      window.scrollTo({
-                        top: 0, // Scroll to the top
-                        behavior: 'smooth', // Add smooth scrolling effect
-                      });
-                    }
-                  }}
-                  sx={{
-                    width: '100%', // Matches LinearProgress width
-                    backgroundColor: '#000',
-                    color: '#fff',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    padding: '10px 0', // Adjust padding for consistent height
-                    textTransform: 'uppercase',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '4px',
-                    boxShadow: 'none',
-                    '&:hover': {
-                      backgroundColor: '#000',
-                      boxShadow: 'none',
-                    },
-                  }}
-                >
-                  {visibleSubGroup2 >= sortedSubGroup2List.length
-                    ? 'Show Less'
-                    : 'Load More'}
-                </Button>
-              </Box>
-            )}
-          </>
-        )}
-
       </Stack>
-      {(notFound || productsEmpty) && renderNotFound}
-      <ProductList
-        products={products}
-        loading={loading}
-        page={page}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-      />
+
+      {showSplitLayout ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'flex-start',
+            gap: { xs: 2, md: 3 },
+          }}
+        >
+          {/* LEFT: Sub categories (sticky so they stay in view while browsing products) */}
+          {renderSubCategorySidebar}
+          {renderMobileSubCategoryPicker}
+
+          {/* RIGHT: Products of the selected sub category */}
+          <Box
+            ref={productsPaneRef}
+            sx={{ flex: 1, minWidth: 0, width: '100%', scrollMarginTop: `${STICKY_TOP_OFFSET}px` }}
+          >
+            {(notFound || productsEmpty) && renderNotFound}
+            <ProductList
+              products={products}
+              loading={loading}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              gridColumns={SPLIT_GRID_COLUMNS}
+            />
+          </Box>
+        </Box>
+      ) : (
+        <>
+          {(notFound || productsEmpty) && renderNotFound}
+          <ProductList
+            products={products}
+            loading={loading}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </>
+      )}
     </Container>
   );
 }
