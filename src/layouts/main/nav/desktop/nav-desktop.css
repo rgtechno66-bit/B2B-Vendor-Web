@@ -1,0 +1,169 @@
+.nav-desktop-item {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.menu-container {
+  display: block;
+  position: fixed;
+  z-index: 1400;
+  padding: 0 !important;
+  margin: 0;
+  background: transparent !important;
+  transform: none !important;
+  box-shadow: none;
+  min-height: 40px;
+}
+
+.menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: smaller;
+}
+
+.menu-item {
+  padding: 0;
+  cursor: pointer;
+  color: #333;
+  transition: background-color 0.2s ease;
+}
+
+.menu-item:hover,
+.menu-item.is-active {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+}
+
+.menu-item:hover .menu-btn,
+.menu-item.is-active .menu-btn {
+  color: #ffffff !important;
+}
+
+.menu-item button,
+.menu-btn {
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  margin: 0;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  font-size: inherit;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.menu-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.menu-chevron {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.menu-item .menu-btn.active {
+  font-weight: 600;
+}
+
+.subGroup1 {
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  z-index: 21;
+  width: 300px;
+  max-height: min(550px, calc(100vh - 120px));
+  color: black;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.subGroup1 .menu-item,
+.subGroup1 .menu-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subGroup2 {
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: absolute;
+  left: 300px;
+  z-index: 22;
+  width: max-content;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 340px));
+  max-height: min(550px, calc(100vh - 120px));
+  margin: 0;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Full subcategory names — wrap instead of cutting off */
+.subGroup2 .menu-item {
+  overflow: visible;
+  white-space: normal;
+}
+
+.subGroup2 .menu-btn {
+  white-space: normal;
+  align-items: flex-start;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.menu::-webkit-scrollbar,
+.resource::-webkit-scrollbar {
+  width: 8px;
+}
+
+.menu::-webkit-scrollbar-thumb,
+.resource::-webkit-scrollbar-thumb {
+  background-color: #bbb;
+  border-radius: 4px;
+}
+
+.menu::-webkit-scrollbar-thumb:hover,
+.resource::-webkit-scrollbar-thumb:hover {
+  background-color: #999;
+}
+
+.topFixed {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 982 !important;
+  box-shadow: 0px 0px 6px 0px rgba(0, 0, 0, 0.5);
+}
+
+.resource {
+  width: 200px;
+  max-height: min(550px, calc(100vh - 120px));
+  overflow-y: auto;
+  color: black;
+  background-color: #ffffff;
+  z-index: 20;
+  position: relative;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

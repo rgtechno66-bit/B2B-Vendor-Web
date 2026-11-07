@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /auth/
+Disallow: /product/checkout
+Disallow: /product/form
+Disallow: /404
+Disallow: /403
+Disallow: /500
+
+Sitemap: https://www.intecomart.com/sitemap.xml
