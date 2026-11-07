@@ -14,8 +14,8 @@ import { FaAngleLeft, FaAngleRight } from "react-icons/fa6";
 import { fetchBanner } from 'src/services/bannerApi';
 import { toAbsoluteUploadUrl } from 'src/utils/product-image';
 import {
-  BANNER_DUMMY_IMAGE,
   DEFAULT_BANNER_PLACEHOLDER_PATH,
+  DEFAULT_HOME_BANNER_IMAGES,
 } from 'src/constfile/dummyImage';
 
 // Styled buttons for better UI
@@ -76,10 +76,8 @@ export function HomeCarousel({ sx, ...other }) {
         setLoadedImages({});
         // Check if `data` is empty or invalid
         if (!data || data.length === 0) {
-          console.warn("No data received. Setting fallback image.");
-          setCarouselImages([
-            BANNER_DUMMY_IMAGE,
-          ]);
+          console.warn("No data received. Setting default Home banners.");
+          setCarouselImages(DEFAULT_HOME_BANNER_IMAGES);
           return;
         }
 
@@ -89,14 +87,13 @@ export function HomeCarousel({ sx, ...other }) {
      if (homeBanner && Array.isArray(homeBanner.BannerImages) && homeBanner.BannerImages.length > 0) {
        setCarouselImages(homeBanner.BannerImages.map(toAbsoluteUploadUrl));
      } else {
-       console.warn("No Home banner found or no images. Setting fallback image.");
-       setCarouselImages([
-         BANNER_DUMMY_IMAGE,
-       ]);
+       console.warn("No Home banner found or no images. Setting default Home banners.");
+       setCarouselImages(DEFAULT_HOME_BANNER_IMAGES);
      }
       } catch (err) { // Renamed `error` to `err` to avoid shadowing
         console.error('Failed to fetch banner data:', err);
-        setError('Failed to load banners');
+        // Show default slides instead of an error message
+        setCarouselImages(DEFAULT_HOME_BANNER_IMAGES);
       } finally {
         setLoading(false);
       }
