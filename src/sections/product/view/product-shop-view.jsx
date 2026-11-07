@@ -42,7 +42,7 @@ const SPLIT_GRID_COLUMNS = {
 };
 
 /** Offset (px) below the sticky site header for the sidebar / scroll target. */
-const STICKY_TOP_OFFSET = 110;
+const STICKY_TOP_OFFSET = 130;
 
 export function ProductShopView() {
   const dispatch = useDispatch();
