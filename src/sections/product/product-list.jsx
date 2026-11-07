@@ -7,24 +7,7 @@ import { Typography } from '@mui/material';
 
 // ----------------------------------------------------------------------
 
-const DEFAULT_GRID_COLUMNS = {
-  xs: 'repeat(2, 1fr)',
-  sm: 'repeat(3, 1fr)',
-  md: 'repeat(4, 1fr)',
-  lg: 'repeat(5, 1fr)',
-  xl: 'repeat(6, 1fr)',
-  '2xl': 'repeat(7, 1fr)',
-};
-
-export function ProductList({
-  products,
-  loading,
-  page,
-  totalPages = 1,
-  onPageChange,
-  gridColumns = DEFAULT_GRID_COLUMNS,
-  ...other
-}) {
+export function ProductList({ products, loading, page, totalPages = 1, onPageChange, ...other }) {
   const hasProducts = Array.isArray(products) && products.length > 0;
   // Keep existing cards while searching — only show skeleton on first empty load
   const showSkeleton = loading && !hasProducts;
@@ -76,7 +59,14 @@ export function ProductList({
         gap={2}
         display="grid"
         alignItems="start"
-        gridTemplateColumns={gridColumns}
+        gridTemplateColumns={{
+          xs: 'repeat(2, 1fr)',
+          sm: 'repeat(3, 1fr)',
+          md: 'repeat(4, 1fr)',
+          lg: 'repeat(5, 1fr)',
+          xl: 'repeat(6, 1fr)',
+          '2xl': 'repeat(7, 1fr)',
+        }}
         sx={{
           opacity: loading && hasProducts ? 0.55 : 1,
           transition: 'opacity 0.2s ease',

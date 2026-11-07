@@ -38,11 +38,10 @@ export function HomeView() {
         {/* Home Category */}
         <HomeProductGroup />
 
-        {/* Top Hot Products */}
-        <ProductTopList />
-
         {/* Home Letest Product */}
         <HomeLetestProduct />
+
+        <ProductTopList/>
       </Stack>
     </div>
   );
