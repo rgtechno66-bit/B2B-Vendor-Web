@@ -1,5 +1,7 @@
-const GOOGLE_MAPS_API_KEY =
-  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDubPQl4clS4Crl8HosdyTmAo0J38u_cNM';
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+export const GOOGLE_MAPS_AUTH_ERROR_MESSAGE =
+  'Google Maps rejected the API key for this site. Check that the current domain is listed under the key\'s Website restrictions, the Maps JavaScript API is enabled, and billing is active (Google Cloud Console → APIs & Services → Credentials).';
 
 const CALLBACK_NAME = '__b2bGoogleMapsInit';
 
@@ -20,6 +22,10 @@ export function loadGoogleMaps() {
 
   if (loadPromise) {
     return loadPromise;
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(new Error('MissingApiKey'));
   }
 
   loadPromise = new Promise((resolve, reject) => {
@@ -50,8 +56,12 @@ export function loadGoogleMaps() {
 export function getGoogleMapsLoadErrorMessage(error) {
   const message = error?.message || '';
 
+  if (message.includes('MissingApiKey')) {
+    return 'Google Maps API key is not configured. Set VITE_GOOGLE_MAPS_API_KEY in the build environment and rebuild.';
+  }
+
   if (message.includes('RefererNotAllowed') || message.includes('referer')) {
-    return 'Google Maps API key does not allow this site. Add http://localhost:3031/* in Google Cloud Console → APIs & Services → Credentials → API key → Website restrictions.';
+    return GOOGLE_MAPS_AUTH_ERROR_MESSAGE;
   }
 
   return 'Map could not be loaded. Please check the Google Maps API key and refresh the page.';

@@ -11,7 +11,11 @@ import Collapse from "@mui/material/Collapse";
 import CircularProgress from "@mui/material/CircularProgress";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
-import { loadGoogleMaps, getGoogleMapsLoadErrorMessage } from "src/utils/google-maps";
+import {
+  loadGoogleMaps,
+  getGoogleMapsLoadErrorMessage,
+  GOOGLE_MAPS_AUTH_ERROR_MESSAGE,
+} from "src/utils/google-maps";
 
 
 export function DealerMap() {
@@ -62,9 +66,7 @@ export function DealerMap() {
 
     window.gm_authFailure = () => {
       if (cancelled) return;
-      setMapError(
-        'Google Maps API key does not allow this site. Add http://localhost:3031/* in Google Cloud Console → Credentials → API key → Website restrictions.'
-      );
+      setMapError(GOOGLE_MAPS_AUTH_ERROR_MESSAGE);
       setMapLoading(false);
     };
 
